@@ -4,17 +4,22 @@ A powerful Telegram bot that collects messages from private groups, analyzes the
 
 ## Features
 
-- 📥 **Message Collection**: Collects all messages from monitored private groups
+- 📥 **Message Collection**: Collects all messages from monitored private groups with automatic retry logic
 - 🤖 **Multi-AI Analysis**: Pluggable architecture supporting Perplexity, Gemini, OpenAI, and more
 - 📊 **Comprehensive Analysis**:
-  - Summarization (max 500 words)
-  - Fact-checking with confidence scores
-  - Sentiment analysis
+  - Detailed summarization with 8-12 bullet points (no word limits)
+  - AI objective assessment with insights, risks, and opportunities
+  - Fact-checking with confidence scores and source attribution
+  - Sentiment analysis (positive/negative/neutral/mixed)
   - Topic categorization (Crypto, Finance, Geopolitics)
-  - Importance scoring
-- 📬 **Daily Digest**: Automated delivery at 0:00 UTC
-- 🐳 **Docker Ready**: Fully containerized for easy deployment
-- 💾 **SQLite Storage**: Lightweight message history
+  - Importance scoring (0-100%)
+- 🎯 **Factual & Objective**: Temperature 0.2 for accurate, non-speculative analysis
+- 📋 **Separate Group Digests**: Each monitored group gets its own formatted digest
+- 📬 **Daily Digest**: Automated delivery at 0:00 UTC with immediate test run on start
+- 🔄 **Robust Retry Logic**: Automatic retries for API calls, message collection, and sending
+- 🌏 **Multi-language**: Preserves input language (Vietnamese/English) in output
+- 🐳 **Docker Ready**: Fully containerized with helper scripts for easy deployment
+- 💾 **SQLite Storage**: Lightweight message history with automatic deduplication
 
 ## Architecture
 
@@ -43,13 +48,18 @@ A powerful Telegram bot that collects messages from private groups, analyzes the
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
 │  │  Perplexity  │  │    Gemini    │  │   OpenAI     │           │
 │  │  (Primary)   │  │  (Fallback)  │  │  (Fallback)  │           │
+│  │ Temp: 0.2    │  │              │  │              │           │
+│  │ Top-P: 0.9   │  │              │  │              │           │
 │  └──────────────┘  └──────────────┘  └──────────────┘           │
+│         • Analyzes each group separately                         │
+│         • Factual, objective output only                         │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              BOT CLIENT (python-telegram-bot)                    │
-│         • Sends daily digest to your review group                │
+│         • Sends separate digest per group                        │
+│         • HTML formatted with numbered lists                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -148,10 +158,22 @@ python -m src.main
 #### Docker (Production)
 
 ```bash
-docker-compose up -d
+# First time: Build and start
+./docker-run.sh up
+
+# Subsequent runs: Start existing container (faster)
+./docker-run.sh start
+
+# View logs
+./docker-run.sh logs
+
+# See all commands
+./docker-run.sh
 ```
 
 > **Note:** Run steps 4-5 locally first before Docker deployment. The session files will be mounted from `sessions/` volume.
+>
+> See [DOCKER.md](DOCKER.md) for complete Docker deployment guide.
 
 ## Configuration
 
@@ -180,6 +202,55 @@ PRIMARY_AI_PROVIDER=perplexity
 
 # Schedule (cron format)
 DIGEST_SCHEDULE=0 0 * * *
+```
+
+## Analysis Output Format
+
+Each group receives a separate digest with:
+
+```
+━━━━━━━━━━━━━━━━━━━━━
+📰 BÁO CÁO HÀNG NGÀY
+━━━━━━━━━━━━━━━━━━━━━
+📂 Nhóm: Group Name
+
+📊 Thông tin tổng quan:
+  📨 Số tin: 130
+  🔥 Độ quan trọng: 85%
+  🟡 Tâm lý: Mixed
+  🏷️ Chủ đề: ₿ Crypto | 💰 Finance
+
+━━━━━━━━━━━━━━━━━━━━━
+📝 PHÂN TÍCH CHI TIẾT
+━━━━━━━━━━━━━━━━━━━━━
+
+1. [Fact point 1]
+
+2. [Fact point 2]
+
+...
+
+━━━━━━━━━━━━━━━━━━━━━
+🤖 NHẬN ĐỊNH CỦA AI
+━━━━━━━━━━━━━━━━━━━━━
+
+1. [Insight/Risk/Opportunity 1]
+
+2. [Insight/Risk/Opportunity 2]
+
+...
+
+━━━━━━━━━━━━━━━━━━━━━
+✓ KIỂM TRA SỰ THẬT
+━━━━━━━━━━━━━━━━━━━━━
+
+1. [Verifiable claim 1]
+
+2. [Verifiable claim 2]
+
+...
+
+✅ Độ tin cậy: 92%
 ```
 
 ## Getting Chat IDs
