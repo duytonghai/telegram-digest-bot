@@ -1,0 +1,12 @@
+services:
+  telegram-digest-bot:
+    build: .
+    container_name: telegram-digest-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./sessions:/app/sessions
+    environment:
+      - TZ=UTC
