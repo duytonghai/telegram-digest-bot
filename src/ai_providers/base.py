@@ -3,16 +3,46 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from ..prompts import get_base_system_prompt
+
+
+@dataclass
+class SummaryItem:
+    """A single summary item with source attribution."""
+    type: str  # fact, opinion, rumor
+    text: str
+    sources: list[str] = field(default_factory=list)
+    raw_quotes: list[str] = field(default_factory=list)
+
+
+@dataclass
+class AssessmentItem:
+    """A single assessment/insight item."""
+    label: str  # e.g., "Risk signal", "Potential opportunity"
+    text: str
+    evidence_sources: list[str] = field(default_factory=list)
+
+
+@dataclass
+class FactCheckItem:
+    """A single fact-check claim."""
+    claim: str
+    sources: list[str] = field(default_factory=list)
+    status: str = "not_checkable"  # corroborated_in_chat, conflicting_in_chat, single_source, not_checkable
+    confidence: float = 0.0
+
 
 @dataclass
 class AnalysisResult:
     """Structured result from AI analysis."""
-    summary: str  # Full detailed analysis, no word limit
-    assessment: str  # AI's objective evaluation and insights
-    fact_check: dict  # {"claims": [...], "confidence": 0.0-1.0}
+    summary: list[SummaryItem]  # 8-12 items with source attribution
+    assessment: list[AssessmentItem]  # 5-8 AI insights/risks/opportunities
+    fact_check: list[FactCheckItem]  # Verifiable claims with confidence
     sentiment: str  # positive, negative, neutral, mixed
     topics: list[str]  # e.g., ["Crypto", "Finance", "Geopolitics"]
     importance_score: float  # 0.0-1.0
+    language: str = "vi"  # vi, en, mixed
+    unknowns: list[str] = field(default_factory=list)  # Missing key details
     raw_response: str = ""  # Original AI response for debugging
     metadata: dict = field(default_factory=dict)
 
@@ -52,44 +82,54 @@ class BaseAIProvider(ABC):
         """
         pass
 
-    def get_system_prompt(self) -> str:
-        """Default system prompt for analysis."""
-        return """You are a FACTUAL and OBJECTIVE AI analyst specializing in news digest creation.
+    def get_system_prompt(self, topic_types: list[str] = None) -> str:
+        """Get system prompt with specialized rules based on topic types.
 
-=== CRITICAL GUIDELINES ===
-• ONLY report information that is EXPLICITLY stated in the provided messages
-• DO NOT fabricate, assume, or infer information not present in the source
-• DO NOT add speculation or predictions unless quoting from messages
-• If information is unclear or incomplete, state "Thông tin không rõ ràng" or "Không đủ dữ liệu"
-• Attribute claims to their sources when possible (e.g., "Theo thành viên nhom...")
-• Distinguish between FACTS and OPINIONS clearly
-• Use hedging language for unverified claims: "có thể", "theo tin", "được cho là"
-• NEVER exaggerate or sensationalize information
+        Args:
+            topic_types: List of topic types (e.g., ["crypto", "finance"]).
 
-=== OUTPUT FORMAT ===
+        Returns:
+            str: System prompt with merged specialized rules.
+        """
+        from ..prompts import get_system_prompt
 
-1. **Summary**: 8-12 SHORT bullet points (each on separate line):
-- Each point: ONE clear fact/event (20-40 words max)
-- Quote numbers/prices EXACTLY as stated in messages
-- DO NOT combine multiple items into one paragraph
+        if not topic_types or topic_types == ["general"]:
+            return get_base_system_prompt()
 
-2. **Assessment**: 5-8 SHORT bullet points:
-- OBJECTIVE observations only (what the data shows)
-- Clearly label: "Dự kiến rủi ro", "Cơ hội tiềm năng", "Nhận xét"
-- Base assessments ONLY on information in messages
-- DO NOT make predictions not supported by data
+        # Start with base prompt
+        base = get_base_system_prompt()
 
-3. **Fact-check**:
-- List specific VERIFIABLE claims with source attribution
-- Confidence based on: message source reliability, cross-references
-- Mark as "Chưa xác minh" if cannot be verified
+        # Collect all specialized rules
+        specialized_rules = []
 
-4. **Sentiment**: positive/negative/neutral/mixed (based on message tone)
-5. **Topics**: Crypto, Finance, Geopolitics, or Other
-6. **Importance Score** (0-1): Based on impact and relevance
+        if "crypto" in topic_types:
+            crypto_rules = """
+CRYPTO-SPECIFIC RULES (apply in addition to base rules)
+- Preserve price strings EXACTLY as posted (e.g., "$45,123.45", "45k", "45123").
+- If timeframe is stated (e.g., 24h, 7d), include it; otherwise mark unknown.
+- Distinguish spot vs futures ONLY if explicitly stated.
+- If an exchange is mentioned, include it in the summary item.
+- Any "signal/call/entry/exit" must be labeled as opinion (type="opinion" or "rumor")."""
+            specialized_rules.append(crypto_rules.strip())
 
-IMPORTANT: Output in SAME LANGUAGE as input messages.
-Respond in valid JSON format."""
+        if "finance" in topic_types:
+            finance_rules = """
+FINANCE-SPECIFIC RULES (apply in addition to base rules)
+- Preserve rates/percentages EXACTLY as posted (e.g., "0.25%").
+- Distinguish announced vs implemented ONLY if explicitly stated.
+- If a statement is "analyst expectations / forecasts / guidance", label as opinion.
+- Include dates if explicitly stated; otherwise mark unknown."""
+            specialized_rules.append(finance_rules.strip())
+
+        # Merge specialized rules into base prompt
+        if specialized_rules:
+            merged_rules = "\n\n".join(specialized_rules)
+            return base.replace(
+                "Return ONLY the JSON object.",
+                merged_rules + "\n\nReturn ONLY the JSON object."
+            )
+
+        return base
 
     async def health_check(self) -> bool:
         """Check if the provider is operational."""

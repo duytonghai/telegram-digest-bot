@@ -6,6 +6,7 @@ A powerful Telegram bot that collects messages from private groups, analyzes the
 
 - 📥 **Message Collection**: Collects all messages from monitored private groups with automatic retry logic
 - 🤖 **Multi-AI Analysis**: Pluggable architecture supporting Perplexity, Gemini, OpenAI, and more
+- 🎯 **Topic-Aware Analysis**: Specialized prompts for crypto, finance, or general topics per group
 - 📊 **Comprehensive Analysis**:
   - Detailed summarization with 8-12 bullet points (no word limits)
   - AI objective assessment with insights, risks, and opportunities
@@ -143,7 +144,7 @@ python -m src.utils.get_chat_ids
 
 Copy the IDs and update `.env`:
 
-- `SOURCE_GROUP_IDS` - Groups to monitor (comma-separated)
+- `SOURCE_GROUPS` - Groups to monitor with topic types (JSON format)
 - `DIGEST_CHAT_ID` - Where to send digests
 
 ### 6. Run the Bot
@@ -189,8 +190,10 @@ TELEGRAM_PHONE=+84xxxxxxxxx
 TELEGRAM_BOT_TOKEN=your_bot_token
 DIGEST_CHAT_ID=-100xxxxxxxxxx
 
-# Source Groups to Monitor (comma-separated)
-SOURCE_GROUP_IDS=-100xxxxxxxxxx
+# Source Groups to Monitor (JSON format with topic types)
+# Supported types: general, crypto, finance
+# Each group can have multiple topic types for specialized analysis
+SOURCE_GROUPS=[{"id":"-100xxx","type":["general"]},{"id":"-100yyy","type":["crypto","finance"]}]
 
 # AI Providers
 PERPLEXITY_API_KEY=your_key
@@ -203,6 +206,13 @@ PRIMARY_AI_PROVIDER=perplexity
 # Schedule (cron format)
 DIGEST_SCHEDULE=0 0 * * *
 ```
+
+### Topic Types
+
+- **`general`**: Standard analysis without specialized rules
+- **`crypto`**: Adds cryptocurrency-specific rules (price formats, exchange mentions, trading signals)
+- **`finance`**: Adds finance-specific rules (rates, percentages, analyst guidance)
+- **Multiple types**: Groups can have `["crypto", "finance"]` to combine both rule sets
 
 ## Analysis Output Format
 

@@ -2,7 +2,7 @@
 
 import asyncio
 import signal
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .config import config
 from .database.db import get_database
@@ -17,7 +17,7 @@ from .ai_providers.perplexity import PerplexityProvider
 async def run_digest():
     """Run a single digest cycle: collect, analyze, send."""
     print(f"\n{'='*50}")
-    print(f"🚀 Starting digest run at {datetime.utcnow()}")
+    print(f"🚀 Starting digest run at {datetime.now(timezone.utc)}")
     print(f"{'='*50}\n")
 
     # Initialize components

@@ -1,10 +1,18 @@
 """Configuration management - loads environment variables."""
 
 import os
+import json
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+@dataclass
+class GroupConfig:
+    """Configuration for a single source group."""
+    id: int
+    types: list[str]  # e.g., ["crypto", "finance"]
 
 
 @dataclass
@@ -15,7 +23,8 @@ class TelegramConfig:
     phone: str
     bot_token: str
     digest_chat_id: int
-    source_group_ids: list[int]
+    source_group_ids: list[int]  # For backward compatibility
+    source_groups: dict[int, list[str]]  # group_id -> topic types
 
 
 @dataclass
@@ -37,13 +46,33 @@ class Config:
 
 def load_config() -> Config:
     """Load configuration from environment variables."""
-    # Parse source group IDs (comma-separated)
-    source_ids_str = os.getenv("SOURCE_GROUP_IDS", "")
+    # Try parsing SOURCE_GROUPS (JSON format) first
+    source_groups_str = os.getenv("SOURCE_GROUPS", "")
+    source_groups_dict = {}  # group_id -> [topic_types]
     source_group_ids = []
-    if source_ids_str and not source_ids_str.startswith("-100x"):
-        source_group_ids = [
-            int(gid.strip()) for gid in source_ids_str.split(",") if gid.strip()
-        ]
+
+    if source_groups_str:
+        try:
+            groups = json.loads(source_groups_str)
+            for group in groups:
+                group_id = int(group["id"])
+                types = group.get("type", ["general"])
+                source_groups_dict[group_id] = types
+                source_group_ids.append(group_id)
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            print(f"⚠️ Error parsing SOURCE_GROUPS: {e}")
+            print("   Falling back to SOURCE_GROUP_IDS...")
+
+    # Fallback to old SOURCE_GROUP_IDS format (backward compatibility)
+    if not source_group_ids:
+        source_ids_str = os.getenv("SOURCE_GROUP_IDS", "")
+        if source_ids_str and not source_ids_str.startswith("-100x"):
+            source_group_ids = [
+                int(gid.strip()) for gid in source_ids_str.split(",") if gid.strip()
+            ]
+            # Default all groups to "general" type
+            for gid in source_group_ids:
+                source_groups_dict[gid] = ["general"]
 
     # Parse digest chat ID
     digest_chat_id_str = os.getenv("DIGEST_CHAT_ID", "0")
@@ -58,6 +87,7 @@ def load_config() -> Config:
         bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
         digest_chat_id=digest_chat_id,
         source_group_ids=source_group_ids,
+        source_groups=source_groups_dict,
     )
 
     ai_config = AIConfig(

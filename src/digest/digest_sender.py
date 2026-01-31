@@ -127,38 +127,99 @@ class DigestSender:
 <b>📝 PHÂN TÍCH CHI TIẾT</b>
 ━━━━━━━━━━━━━━━━━━━━━
 
-{self._format_bullet_points(result.summary)}
+{self._format_summary_items(result.summary)}
 
 ━━━━━━━━━━━━━━━━━━━━━
 <b>🤖 NHẬN ĐỊNH CỦA AI</b>
 ━━━━━━━━━━━━━━━━━━━━━
 
-{self._format_bullet_points(result.assessment)}
+{self._format_assessment_items(result.assessment)}
 """
 
         # Add fact-check section if there are claims
-        if result.fact_check.get("claims"):
+        if result.fact_check:
             digest += "\n━━━━━━━━━━━━━━━━━━━━━\n"
             digest += "<b>✓ KIỂM TRA SỰ THẬT</b>\n"
             digest += "━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-            for i, claim in enumerate(result.fact_check["claims"][:10], 1):
-                if isinstance(claim, dict):
-                    claim_text = claim.get('claim', claim)
-                else:
-                    claim_text = claim
-                digest += f"<b>{i}.</b> {claim_text}\n\n"
+            avg_confidence = 0.0
+            for i, item in enumerate(result.fact_check[:10], 1):
+                status_emoji = {
+                    "corroborated_in_chat": "✅",
+                    "conflicting_in_chat": "⚠️",
+                    "single_source": "📝",
+                    "not_checkable": "❓",
+                }.get(item.status, "📝")
+                digest += f"<b>{i}.</b> {status_emoji} {item.claim}\n"
+                if item.sources:
+                    digest += f"    <i>Nguồn: [{', '.join(item.sources)}]</i>\n"
+                digest += "\n"
+                avg_confidence += item.confidence
 
-            confidence = result.fact_check.get("confidence", 0)
-            confidence_emoji = "✅" if confidence >= 0.7 else "⚠️" if confidence >= 0.4 else "❌"
-            digest += f"\n{confidence_emoji} <i>Độ tin cậy: {confidence:.0%}</i>\n"
+            if result.fact_check:
+                avg_confidence /= len(result.fact_check)
+                confidence_emoji = "✅" if avg_confidence >= 0.7 else "⚠️" if avg_confidence >= 0.4 else "❌"
+                digest += f"{confidence_emoji} <i>Độ tin cậy trung bình: {avg_confidence:.0%}</i>\n"
+
+        # Add unknowns section if present
+        if result.unknowns:
+            digest += "\n━━━━━━━━━━━━━━━━━━━━━\n"
+            digest += "<b>❓ THÔNG TIN CHƯA RÕ</b>\n"
+            digest += "━━━━━━━━━━━━━━━━━━━━━\n\n"
+            for unknown in result.unknowns[:5]:
+                digest += f"• {unknown}\n"
 
         digest += "\n━━━━━━━━━━━━━━━━━━━━━"
 
         return digest
 
+    def _format_summary_items(self, items: list) -> str:
+        """Format summary items as numbered list with type indicators."""
+        if not items:
+            return "<i>Không có dữ liệu</i>"
+
+        formatted = []
+        type_emoji = {
+            "fact": "📌",
+            "opinion": "💭",
+            "rumor": "🔮",
+        }
+
+        for i, item in enumerate(items, 1):
+            emoji = type_emoji.get(item.type, "📌")
+            text = f"<b>{i}.</b> {emoji} {item.text}"
+            if item.sources:
+                text += f" <i>[{', '.join(item.sources)}]</i>"
+            formatted.append(text)
+
+        return "\n\n".join(formatted)
+
+    def _format_assessment_items(self, items: list) -> str:
+        """Format assessment items as numbered list with labels."""
+        if not items:
+            return "<i>Không có nhận định</i>"
+
+        formatted = []
+        label_emoji = {
+            "Nhận xét": "💡",
+            "Commentary": "💡",
+            "Dấu hiệu rủi ro": "⚠️",
+            "Risk signal": "⚠️",
+            "Cơ hội tiềm năng": "🎯",
+            "Potential opportunity": "🎯",
+        }
+
+        for i, item in enumerate(items, 1):
+            emoji = label_emoji.get(item.label, "💡")
+            text = f"<b>{i}.</b> {emoji} <b>{item.label}:</b> {item.text}"
+            if item.evidence_sources:
+                text += f" <i>[{', '.join(item.evidence_sources)}]</i>"
+            formatted.append(text)
+
+        return "\n\n".join(formatted)
+
     def _format_bullet_points(self, text: str) -> str:
-        """Format text as numbered list like fact-check section."""
+        """Format text as numbered list (legacy fallback)."""
         if not text:
             return ""
 
