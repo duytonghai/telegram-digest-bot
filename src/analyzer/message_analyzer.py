@@ -54,6 +54,11 @@ class MessageAnalyzer:
 
         # Analyze each group separately
         for group_name, group_messages in groups.items():
+            # Skip groups with too few messages
+            if len(group_messages) < 3:
+                print(f"  ⏭️  Skipping '{group_name}' ({len(group_messages)} messages - minimum 3 required)")
+                continue
+
             print(f"  🔍 Analyzing {len(group_messages)} messages from '{group_name}'...")
             result = await self.analyze_single_group(group_messages)
             results.append((group_name, result, len(group_messages)))

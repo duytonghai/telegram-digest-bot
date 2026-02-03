@@ -50,7 +50,7 @@ async def run_digest():
         results = await analyzer.analyze_recent_messages()
 
         if not results:
-            print("ℹ️ No messages to analyze")
+            print("ℹ️ No groups with sufficient messages to analyze (minimum 3 per group)")
             return
 
         # Send separate digest for each group
@@ -86,6 +86,7 @@ async def main():
     scheduler = JobScheduler()
     scheduler.add_digest_job(run_digest)
     scheduler.start()
+    scheduler.show_next_run()
 
     # Run initial digest
     await run_digest()

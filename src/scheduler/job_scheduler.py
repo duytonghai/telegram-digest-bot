@@ -2,6 +2,7 @@
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from datetime import timezone
 
 from ..config import config
 
@@ -34,9 +35,10 @@ class JobScheduler:
             day=day,
             month=month,
             day_of_week=day_of_week,
+            timezone=timezone.utc,  # Explicitly set UTC timezone
         )
 
-        self.scheduler.add_job(
+        job = self.scheduler.add_job(
             job_func,
             trigger=trigger,
             id="daily_digest",
@@ -44,6 +46,12 @@ class JobScheduler:
         )
 
         print(f"📅 Digest scheduled: {schedule}")
+
+    def show_next_run(self):
+        """Print the next scheduled run time."""
+        scheduled_job = self.scheduler.get_job("daily_digest")
+        if scheduled_job and scheduled_job.next_run_time:
+            print(f"⏰ Next run at: {scheduled_job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
     def start(self):
         """Start the scheduler."""
