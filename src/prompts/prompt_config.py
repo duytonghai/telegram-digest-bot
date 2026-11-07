@@ -123,6 +123,14 @@ def get_parameter_docs(param_name: str = None) -> Dict:
 
 # API-specific configurations
 API_CONFIGS = {
+    "deepseek": {
+        "model": "deepseek-flash",
+        "base_url": "https://api.deepseek.com",
+        "timeout": 180.0,
+        "max_retries": 3,
+        "retry_delay": 1,
+        "max_tokens": 8000,
+    },
     "perplexity": {
         "model": "sonar-pro",
         "timeout": 120.0,
@@ -148,7 +156,7 @@ def get_api_config(provider: str) -> Dict[str, Any]:
     """Get API-specific configuration.
 
     Args:
-        provider: AI provider name (perplexity, gemini, openai).
+        provider: AI provider name (deepseek, perplexity, gemini, openai).
 
     Returns:
         Dict with provider-specific settings.

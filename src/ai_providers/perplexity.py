@@ -3,13 +3,7 @@
 import asyncio
 import json
 import httpx
-from .base import (
-    BaseAIProvider,
-    AnalysisResult,
-    SummaryItem,
-    AssessmentItem,
-    FactCheckItem,
-)
+from .base import BaseAIProvider, AnalysisResult
 from ..prompts import get_analysis_user_prompt, get_ai_parameters, get_api_config
 
 
@@ -120,84 +114,4 @@ class PerplexityProvider(BaseAIProvider):
                 "unknowns": ["Failed to parse AI response"],
             }
 
-        # Parse summary items
-        summary_items = []
-        raw_summary = parsed.get("summary", [])
-        if isinstance(raw_summary, list):
-            for item in raw_summary:
-                if isinstance(item, dict):
-                    summary_items.append(SummaryItem(
-                        type=item.get("type", "fact"),
-                        text=item.get("text", ""),
-                        sources=item.get("sources", []),
-                        raw_quotes=item.get("raw_quotes", []),
-                    ))
-                elif isinstance(item, str):
-                    summary_items.append(SummaryItem(type="fact", text=item, sources=[], raw_quotes=[]))
-        elif isinstance(raw_summary, str):
-            # Legacy format: split string into items
-            for line in raw_summary.split("\n"):
-                if line.strip():
-                    summary_items.append(SummaryItem(type="fact", text=line.strip(), sources=[], raw_quotes=[]))
-
-        # Parse assessment items
-        assessment_items = []
-        raw_assessment = parsed.get("assessment", [])
-        if isinstance(raw_assessment, list):
-            for item in raw_assessment:
-                if isinstance(item, dict):
-                    assessment_items.append(AssessmentItem(
-                        label=item.get("label", "Nhận xét"),
-                        text=item.get("text", ""),
-                        evidence_sources=item.get("evidence_sources", []),
-                    ))
-                elif isinstance(item, str):
-                    assessment_items.append(AssessmentItem(label="Nhận xét", text=item, evidence_sources=[]))
-        elif isinstance(raw_assessment, str):
-            for line in raw_assessment.split("\n"):
-                if line.strip():
-                    assessment_items.append(AssessmentItem(label="Nhận xét", text=line.strip(), evidence_sources=[]))
-
-        # Parse fact-check items
-        fact_check_items = []
-        raw_fact_check = parsed.get("fact_check", [])
-        if isinstance(raw_fact_check, list):
-            for item in raw_fact_check:
-                if isinstance(item, dict):
-                    fact_check_items.append(FactCheckItem(
-                        claim=item.get("claim", ""),
-                        sources=item.get("sources", []),
-                        status=item.get("status", "not_checkable"),
-                        confidence=float(item.get("confidence", 0.0)),
-                    ))
-        elif isinstance(raw_fact_check, dict):
-            # Legacy format: {"claims": [...], "confidence": 0.5}
-            claims = raw_fact_check.get("claims", [])
-            default_confidence = raw_fact_check.get("confidence", 0.5)
-            for claim in claims:
-                if isinstance(claim, dict):
-                    fact_check_items.append(FactCheckItem(
-                        claim=claim.get("claim", str(claim)),
-                        sources=claim.get("sources", []),
-                        status=claim.get("status", "single_source"),
-                        confidence=float(claim.get("confidence", default_confidence)),
-                    ))
-                elif isinstance(claim, str):
-                    fact_check_items.append(FactCheckItem(
-                        claim=claim,
-                        sources=[],
-                        status="single_source",
-                        confidence=float(default_confidence),
-                    ))
-
-        return AnalysisResult(
-            summary=summary_items,
-            assessment=assessment_items,
-            fact_check=fact_check_items,
-            sentiment=parsed.get("sentiment", "neutral"),
-            topics=parsed.get("topics", ["Other"]),
-            importance_score=float(parsed.get("importance_score", 0.5)),
-            language=parsed.get("language", "vi"),
-            unknowns=parsed.get("unknowns", []),
-            raw_response=raw_content,
-        )
+        return self._build_result(parsed, raw_content)

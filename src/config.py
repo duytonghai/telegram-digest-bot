@@ -30,6 +30,7 @@ class TelegramConfig:
 @dataclass
 class AIConfig:
     """AI providers configuration."""
+    deepseek_api_key: str | None
     perplexity_api_key: str | None
     gemini_api_key: str | None
     openai_api_key: str | None
@@ -91,6 +92,8 @@ def load_config() -> Config:
     )
 
     ai_config = AIConfig(
+        # DEEPSEE_API_KEY is accepted as an alias for the misspelled name.
+        deepseek_api_key=os.getenv("DEEPSEEK_API_KEY") or os.getenv("DEEPSEE_API_KEY"),
         perplexity_api_key=os.getenv("PERPLEXITY_API_KEY"),
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),

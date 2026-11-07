@@ -150,7 +150,7 @@ class Database:
         ]
 
     async def get_unprocessed_messages(self) -> list[Message]:
-        """Get messages that haven't been included in a digest yet."""
+        """Get undigested messages from the last 24 hours. Older ones are stale."""
         cursor = await self._connection.execute(
             """
             SELECT id, group_id, group_name, message_id, sender_name,
@@ -159,6 +159,7 @@ class Database:
             WHERE collected_at > (
                 SELECT COALESCE(MAX(created_at), '1970-01-01') FROM digests
             )
+            AND timestamp >= datetime('now', '-1 day')
             ORDER BY timestamp ASC
             """
         )

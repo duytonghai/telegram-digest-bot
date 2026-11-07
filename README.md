@@ -5,7 +5,7 @@ A powerful Telegram bot that collects messages from private groups, analyzes the
 ## Features
 
 - 📥 **Message Collection**: Collects all messages from monitored private groups with automatic retry logic
-- 🤖 **Multi-AI Analysis**: Pluggable architecture supporting Perplexity, Gemini, OpenAI, and more
+- 🤖 **Multi-AI Analysis**: Pluggable architecture supporting DeepSeek and Perplexity
 - 🎯 **Topic-Aware Analysis**: Specialized prompts for crypto, finance, or general topics per group
 - 📊 **Comprehensive Analysis**:
   - Detailed summarization with 8-12 bullet points (no word limits)
@@ -47,11 +47,10 @@ A powerful Telegram bot that collects messages from private groups, analyzes the
 ┌─────────────────────────────────────────────────────────────────┐
 │                 AI PROCESSOR (Pluggable)                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  Perplexity  │  │    Gemini    │  │   OpenAI     │           │
-│  │  (Primary)   │  │  (Fallback)  │  │  (Fallback)  │           │
-│  │ Temp: 0.2    │  │              │  │              │           │
-│  │ Top-P: 0.9   │  │              │  │              │           │
-│  └──────────────┘  └──────────────┘  └──────────────┘           │
+│  │   DeepSeek   │  │  Perplexity  │                             │
+│  │  (Primary)   │  │  (Fallback)  │                             │
+│  │ Temp: 0.2    │  │              │                             │
+│  └──────────────┘  └──────────────┘                             │
 │         • Analyzes each group separately                         │
 │         • Factual, objective output only                         │
 └─────────────────────────────────────────────────────────────────┘
@@ -84,9 +83,8 @@ A powerful Telegram bot that collects messages from private groups, analyzes the
 
 #### AI API Keys
 
-- **Perplexity**: https://www.perplexity.ai/settings/api
-- **Gemini** (optional): https://makersuite.google.com/app/apikey
-- **OpenAI** (optional): https://platform.openai.com/api-keys
+- **DeepSeek**: https://platform.deepseek.com/api_keys
+- **Perplexity** (optional fallback): https://www.perplexity.ai/settings/api
 
 ### 2. Setup Environment
 
@@ -121,7 +119,7 @@ Required settings in `.env`:
 - `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` - From my.telegram.org
 - `TELEGRAM_PHONE` - Your phone number with country code
 - `TELEGRAM_BOT_TOKEN` - From @BotFather
-- `PERPLEXITY_API_KEY` - From Perplexity settings
+- `DEEPSEEK_API_KEY` - From the DeepSeek platform
 
 ### 4. Authenticate Telegram
 
@@ -196,12 +194,11 @@ DIGEST_CHAT_ID=-100xxxxxxxxxx
 SOURCE_GROUPS=[{"id":"-100xxx","type":["general"]},{"id":"-100yyy","type":["crypto","finance"]}]
 
 # AI Providers
-PERPLEXITY_API_KEY=your_key
-GEMINI_API_KEY=optional
-OPENAI_API_KEY=optional
+DEEPSEEK_API_KEY=your_key
+PERPLEXITY_API_KEY=optional
 
-# Primary AI Provider (perplexity, gemini, openai)
-PRIMARY_AI_PROVIDER=perplexity
+# Primary AI Provider (deepseek, perplexity)
+PRIMARY_AI_PROVIDER=deepseek
 
 # Schedule (cron format)
 DIGEST_SCHEDULE=0 0 * * *
@@ -287,9 +284,9 @@ telegram-digest-bot/
 │   ├── ai_providers/
 │   │   ├── __init__.py
 │   │   ├── base.py             # Abstract base class
+│   │   ├── deepseek.py
 │   │   ├── perplexity.py
-│   │   ├── gemini.py
-│   │   ├── openai_provider.py
+│   │   ├── factory.py          # Builds the manager from config
 │   │   └── manager.py          # AI provider manager
 │   ├── analyzer/
 │   │   ├── __init__.py
@@ -314,7 +311,7 @@ telegram-digest-bot/
 1. Create a new file in `src/ai_providers/`
 2. Extend `BaseAIProvider` class
 3. Implement required methods
-4. Register in `src/ai_providers/manager.py`
+4. Register in `src/ai_providers/factory.py`
 
 Example:
 

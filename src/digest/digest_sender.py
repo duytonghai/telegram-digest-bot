@@ -1,12 +1,24 @@
 """Digest sender - formats and sends digests via python-telegram-bot."""
 
 import asyncio
+from html import escape
+
 from telegram import Bot
 from telegram.constants import ParseMode
 from telegram.error import RetryAfter, TimedOut, NetworkError
 
 from ..config import config
 from ..ai_providers.base import AnalysisResult
+
+
+def _esc(value) -> str:
+    """Escape untrusted text for Telegram HTML mode."""
+    return escape(str(value), quote=False)
+
+
+def _esc_list(values: list) -> str:
+    """Join untrusted values into one escaped, comma-separated string."""
+    return _esc(", ".join(str(v) for v in values))
 
 
 class DigestSender:
@@ -106,11 +118,11 @@ class DigestSender:
             "Other": "📌"
         }
         topics_formatted = " | ".join(
-            f"{topic_emojis.get(t, '📌')} {t}" for t in (result.topics or ["Other"])
+            f"{topic_emojis.get(t, '📌')} {_esc(t)}" for t in (result.topics or ["Other"])
         )
 
         # Group header
-        group_header = f"\n📂 <b>Nhóm:</b> {group_name}" if group_name else ""
+        group_header = f"\n📂 <b>Nhóm:</b> {_esc(group_name)}" if group_name else ""
 
         # Build digest with improved formatting
         digest = f"""━━━━━━━━━━━━━━━━━━━━━
@@ -120,7 +132,7 @@ class DigestSender:
 <b>📊 Thông tin tổng quan:</b>
   📨 Số tin: <code>{message_count}</code>
   {importance_emoji} Độ quan trọng: <b>{result.importance_score:.0%}</b>
-  {sentiment_emoji} Tâm lý: <b>{result.sentiment.title()}</b>
+  {sentiment_emoji} Tâm lý: <b>{_esc(result.sentiment.title())}</b>
   🏷️ Chủ đề: {topics_formatted}
 
 ━━━━━━━━━━━━━━━━━━━━━
@@ -150,9 +162,9 @@ class DigestSender:
                     "single_source": "📝",
                     "not_checkable": "❓",
                 }.get(item.status, "📝")
-                digest += f"<b>{i}.</b> {status_emoji} {item.claim}\n"
+                digest += f"<b>{i}.</b> {status_emoji} {_esc(item.claim)}\n"
                 if item.sources:
-                    digest += f"    <i>Nguồn: [{', '.join(item.sources)}]</i>\n"
+                    digest += f"    <i>Nguồn: [{_esc_list(item.sources)}]</i>\n"
                 digest += "\n"
                 avg_confidence += item.confidence
 
@@ -167,7 +179,7 @@ class DigestSender:
             digest += "<b>❓ THÔNG TIN CHƯA RÕ</b>\n"
             digest += "━━━━━━━━━━━━━━━━━━━━━\n\n"
             for unknown in result.unknowns[:5]:
-                digest += f"• {unknown}\n"
+                digest += f"• {_esc(unknown)}\n"
 
         digest += "\n━━━━━━━━━━━━━━━━━━━━━"
 
@@ -187,9 +199,9 @@ class DigestSender:
 
         for i, item in enumerate(items, 1):
             emoji = type_emoji.get(item.type, "📌")
-            text = f"<b>{i}.</b> {emoji} {item.text}"
+            text = f"<b>{i}.</b> {emoji} {_esc(item.text)}"
             if item.sources:
-                text += f" <i>[{', '.join(item.sources)}]</i>"
+                text += f" <i>[{_esc_list(item.sources)}]</i>"
             formatted.append(text)
 
         return "\n\n".join(formatted)
@@ -211,9 +223,9 @@ class DigestSender:
 
         for i, item in enumerate(items, 1):
             emoji = label_emoji.get(item.label, "💡")
-            text = f"<b>{i}.</b> {emoji} <b>{item.label}:</b> {item.text}"
+            text = f"<b>{i}.</b> {emoji} <b>{_esc(item.label)}:</b> {_esc(item.text)}"
             if item.evidence_sources:
-                text += f" <i>[{', '.join(item.evidence_sources)}]</i>"
+                text += f" <i>[{_esc_list(item.evidence_sources)}]</i>"
             formatted.append(text)
 
         return "\n\n".join(formatted)

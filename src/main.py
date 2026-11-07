@@ -10,8 +10,7 @@ from .collector.message_collector import MessageCollector
 from .analyzer.message_analyzer import MessageAnalyzer
 from .digest.digest_sender import DigestSender
 from .scheduler.job_scheduler import JobScheduler
-from .ai_providers.manager import AIProviderManager
-from .ai_providers.perplexity import PerplexityProvider
+from .ai_providers.factory import build_ai_manager
 
 
 async def run_digest():
@@ -24,13 +23,8 @@ async def run_digest():
     db = await get_database()
 
     try:
-        # Setup AI provider
-        ai_manager = AIProviderManager()
-        if config.ai.perplexity_api_key:
-            ai_manager.register(
-                PerplexityProvider(config.ai.perplexity_api_key),
-                is_primary=True,
-            )
+        # Setup AI providers
+        ai_manager = build_ai_manager()
 
         # Collect messages
         print("📥 Collecting messages...")
@@ -82,28 +76,39 @@ async def main():
     print(f"Digest schedule: {config.digest_schedule}")
     print()
 
-    # Setup scheduler
-    scheduler = JobScheduler()
+    # Get current event loop
+    loop = asyncio.get_running_loop()
+
+    # Setup scheduler with the event loop
+    scheduler = JobScheduler(event_loop=loop)
     scheduler.add_digest_job(run_digest)
     scheduler.start()
     scheduler.show_next_run()
 
     # Run initial digest
-    await run_digest()
+    try:
+        await run_digest()
+    except Exception as e:
+        print(f"❌ Initial digest failed: {e}")
 
-    # Keep running
+    # Keep running indefinitely
     stop_event = asyncio.Event()
 
     def signal_handler():
         print("\n🛑 Shutting down...")
         stop_event.set()
 
-    loop = asyncio.get_event_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, signal_handler)
 
-    await stop_event.wait()
-    scheduler.stop()
+    print("\n✅ Bot is running. Waiting for scheduled jobs...")
+    print("   Press Ctrl+C to stop.\n")
+
+    # Wait forever until signal
+    try:
+        await stop_event.wait()
+    finally:
+        scheduler.stop()
 
 
 if __name__ == "__main__":
