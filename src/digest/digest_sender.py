@@ -114,7 +114,10 @@ class DigestSender:
         topic_emojis = {
             "Crypto": "₿",
             "Finance": "💰",
+            "Economy": "📈",
+            "Politics": "🏛️",
             "Geopolitics": "🌍",
+            "Society": "👥",
             "Other": "📌"
         }
         topics_formatted = " | ".join(
@@ -192,7 +195,7 @@ class DigestSender:
 
         formatted = []
         type_emoji = {
-            "fact": "📌",
+            "reported": "📌",
             "opinion": "💭",
             "rumor": "🔮",
         }

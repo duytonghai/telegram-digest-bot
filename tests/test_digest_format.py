@@ -46,7 +46,7 @@ def check(html: str) -> TagChecker:
 
 def make_result(text: str, sources: list) -> AnalysisResult:
     return AnalysisResult(
-        summary=[SummaryItem("fact", text, sources)],
+        summary=[SummaryItem("reported", text, sources)],
         assessment=[AssessmentItem(text, text, sources)],
         fact_check=[FactCheckItem(text, sources, "single_source", 0.4)],
         sentiment=text,
@@ -72,7 +72,7 @@ class DigestFormatTest(unittest.TestCase):
         self.assertIn("1, 2", html)
 
     def test_long_digest_splits_into_valid_chunks(self):
-        items = [SummaryItem("fact", f"{NASTY} {i} " + "x" * 300) for i in range(40)]
+        items = [SummaryItem("reported", f"{NASTY} {i} " + "x" * 300) for i in range(40)]
         result = make_result("ok", [])
         result.summary = items
         chunks = self.sender._split_message(self.sender._format_digest(result, 3, "G"))

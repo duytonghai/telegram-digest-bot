@@ -19,7 +19,7 @@ class PerplexityProvider(BaseAIProvider):
         self.model = "sonar-pro"
 
     async def analyze(
-        self, messages: list[str], context: dict
+        self, messages: list[dict], context: dict
     ) -> AnalysisResult:
         """Analyze messages using Perplexity API."""
         # Get topic types from context
@@ -104,7 +104,7 @@ class PerplexityProvider(BaseAIProvider):
         except json.JSONDecodeError:
             # Fallback to basic parsing with default structure
             parsed = {
-                "summary": [{"type": "fact", "text": raw_content[:500], "sources": [], "raw_quotes": []}],
+                "summary": [{"type": "reported", "text": raw_content[:500], "sources": [], "raw_quotes": []}],
                 "assessment": [],
                 "fact_check": [],
                 "sentiment": "neutral",

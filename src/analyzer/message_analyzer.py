@@ -2,13 +2,41 @@
 
 from datetime import datetime
 
-from ..database.db import Database, Message
+from ..database.db import Database, Message, PRIVATE_FORWARD_PREFIX
 from ..ai_providers.manager import AIProviderManager
 from ..ai_providers.base import AnalysisResult, SummaryItem, AssessmentItem, FactCheckItem
+from .result_validator import sanitize_result
 
 
 # Maximum messages per chunk to avoid token overflow
 MAX_MESSAGES_PER_CHUNK = 300
+
+
+def _to_records(messages: list[Message]) -> list[dict]:
+    """Build prompt records. Ids run across the whole group, not per chunk.
+
+    Member names stay here. The AI sees a stable alias per person, which is
+    enough to tell whether two messages come from different people.
+    """
+    aliases: dict[str, str] = {}
+
+    def alias(name: str) -> str:
+        return aliases.setdefault(name, f"member_{len(aliases) + 1}")
+
+    records = []
+    for msg in (m for m in messages if m.text):
+        record = {
+            "id": len(records) + 1,
+            "sender": alias(msg.sender_name or "Unknown"),
+            "time": msg.timestamp.strftime("%Y-%m-%d %H:%M"),
+            "text": msg.text,
+        }
+        origin = msg.forward_from
+        if origin:
+            is_private = origin.startswith(PRIVATE_FORWARD_PREFIX)
+            record["forwarded_from"] = alias(origin) if is_private else origin
+        records.append(record)
+    return records
 
 
 class MessageAnalyzer:
@@ -74,18 +102,18 @@ class MessageAnalyzer:
         Returns:
             AnalysisResult from AI provider (merged if chunked).
         """
-        # Prepare message texts
-        message_texts = [msg.text for msg in messages if msg.text]
+        # Prepare prompt records
+        records = _to_records(messages)
 
         # Check if chunking is needed
-        if len(message_texts) <= MAX_MESSAGES_PER_CHUNK:
-            return await self._analyze_chunk(message_texts, messages)
+        if len(records) <= MAX_MESSAGES_PER_CHUNK:
+            return await self._analyze_chunk(records, messages)
 
         # Chunk messages and analyze separately, then merge
-        print(f"    📦 Large batch ({len(message_texts)} msgs), splitting into chunks of {MAX_MESSAGES_PER_CHUNK}...")
+        print(f"    📦 Large batch ({len(records)} msgs), splitting into chunks of {MAX_MESSAGES_PER_CHUNK}...")
         chunks = [
-            message_texts[i:i + MAX_MESSAGES_PER_CHUNK]
-            for i in range(0, len(message_texts), MAX_MESSAGES_PER_CHUNK)
+            records[i:i + MAX_MESSAGES_PER_CHUNK]
+            for i in range(0, len(records), MAX_MESSAGES_PER_CHUNK)
         ]
 
         chunk_results = []
@@ -97,15 +125,15 @@ class MessageAnalyzer:
         # Merge results from all chunks
         return self._merge_results(chunk_results)
 
-    async def _analyze_chunk(self, message_texts: list[str], messages: list[Message]) -> AnalysisResult:
+    async def _analyze_chunk(self, records: list[dict], messages: list[Message]) -> AnalysisResult:
         """Analyze a single chunk of messages.
 
         Args:
-            message_texts: List of message text strings.
+            records: Prompt records for this chunk.
             messages: Original Message objects (for context).
 
         Returns:
-            AnalysisResult from AI provider.
+            Checked AnalysisResult from AI provider.
         """
         # Get topic types for this group
         from ..config import config
@@ -115,11 +143,12 @@ class MessageAnalyzer:
         context = {
             "group_name": messages[0].group_name if messages else "Unknown",
             "date_range": self._get_date_range(messages),
-            "message_count": len(message_texts),
+            "message_count": len(records),
             "topic_types": topic_types,  # Pass topic types to AI provider
         }
 
-        return await self.ai_manager.analyze(message_texts, context)
+        result = await self.ai_manager.analyze(records, context)
+        return sanitize_result(result, records)
 
     def _merge_results(self, results: list[AnalysisResult]) -> AnalysisResult:
         """Merge multiple AnalysisResults into one.

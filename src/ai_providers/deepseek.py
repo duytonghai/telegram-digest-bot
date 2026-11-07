@@ -17,7 +17,7 @@ class DeepSeekProvider(BaseAIProvider):
         self.name = "deepseek"
 
     async def analyze(
-        self, messages: list[str], context: dict
+        self, messages: list[dict], context: dict
     ) -> AnalysisResult:
         """Analyze messages using the DeepSeek chat completions API."""
         user_prompt = get_analysis_user_prompt(

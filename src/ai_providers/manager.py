@@ -33,7 +33,7 @@ class AIProviderManager:
         self._fallback_order = [n for n in order if n in self._providers]
 
     async def analyze(
-        self, messages: list[str], context: dict
+        self, messages: list[dict], context: dict
     ) -> AnalysisResult:
         """Analyze messages using primary provider with fallback.
 
@@ -41,7 +41,7 @@ class AIProviderManager:
         in the configured order.
 
         Args:
-            messages: List of message texts.
+            messages: Message dicts for the prompt.
             context: Additional context for analysis.
 
         Returns:

@@ -8,7 +8,7 @@ A powerful Telegram bot that collects messages from private groups, analyzes the
 - 🤖 **Multi-AI Analysis**: Pluggable architecture supporting DeepSeek and Perplexity
 - 🎯 **Topic-Aware Analysis**: Specialized prompts for crypto, finance, or general topics per group
 - 📊 **Comprehensive Analysis**:
-  - Detailed summarization with 8-12 bullet points (no word limits)
+  - Detailed summarization with up to 12 bullet points, scaled to the batch size
   - AI objective assessment with insights, risks, and opportunities
   - Fact-checking with confidence scores and source attribution
   - Sentiment analysis (positive/negative/neutral/mixed)

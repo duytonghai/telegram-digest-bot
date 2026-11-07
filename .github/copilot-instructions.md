@@ -36,8 +36,8 @@ All AI providers must extend `BaseAIProvider` abstract class:
 
 - Implement `analyze(messages: list[str], context: dict) -> AnalysisResult`
 - Return structured data:
-  - `summary` (string): 8-12 bullet points, NO WORD LIMIT, comprehensive analysis
-  - `assessment` (string): 5-8 bullet points with AI's objective insights/risks/opportunities
+  - `summary` (list): up to 12 items, scaled to the batch size, each with cited message ids
+  - `assessment` (list): up to 8 items with AI's objective insights/risks/opportunities
   - `fact_check` (dict): Verifiable claims with source attribution and confidence (0-1)
   - `sentiment` (string): positive/negative/neutral/mixed
   - `topics` (list): Crypto, Finance, Geopolitics, Other
@@ -78,8 +78,8 @@ When implementing AI prompts, include these topic categories:
 
 Analysis must produce:
 
-1. **Summary** (📝 PHÂN TÍCH CHI TIẾT): 8-12 numbered points, each 20-40 words, facts only from messages
-2. **Assessment** (🤖 NHẬN ĐỊNH CỦA AI): 5-8 numbered points (insights/risks/opportunities), objective observations
+1. **Summary** (📝 PHÂN TÍCH CHI TIẾT): up to 12 numbered points, typed reported/opinion/rumor, only from messages
+2. **Assessment** (🤖 NHẬN ĐỊNH CỦA AI): up to 8 numbered points (insights/risks/opportunities), objective observations
 3. **Fact-check** (✓ KIỂM TRA SỰ THẬT): Specific verifiable claims with confidence score
 4. **Sentiment**: Overall tone based on message content
 5. **Topics**: Categorized themes

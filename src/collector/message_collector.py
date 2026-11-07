@@ -7,7 +7,19 @@ from telethon.tl.types import Message as TelethonMessage
 from telethon.errors import FloodWaitError, ServerError, TimedOutError
 
 from ..config import config
-from ..database.db import Database, Message
+from ..database.db import PRIVATE_FORWARD_PREFIX, Database, Message
+
+
+def _forward_source(msg: TelethonMessage) -> str | None:
+    """Return a channel title, or a private marker for any other origin."""
+    forward = msg.forward
+    if not forward:
+        return None
+    title = getattr(forward.chat, "title", None)
+    if title:
+        return title
+    origin = forward.chat_id or forward.sender_id or forward.from_name or "unknown"
+    return f"{PRIVATE_FORWARD_PREFIX}{origin}"
 
 
 class MessageCollector:
@@ -159,6 +171,7 @@ class MessageCollector:
                 text=msg.text,
                 timestamp=msg.date.replace(tzinfo=None),
                 collected_at=datetime.utcnow(),
+                forward_from=_forward_source(msg),
             )
 
             await self.db.save_message(message)

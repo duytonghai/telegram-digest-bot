@@ -9,6 +9,11 @@ from dataclasses import dataclass
 DATABASE_PATH = Path("data/messages.db")
 
 
+# Marks a forward origin that is not a named channel, such as a person.
+# The analyzer replaces these values with an alias before calling the AI.
+PRIVATE_FORWARD_PREFIX = "private:"
+
+
 @dataclass
 class Message:
     """Stored message from a Telegram group."""
@@ -20,6 +25,22 @@ class Message:
     text: str
     timestamp: datetime
     collected_at: datetime
+    forward_from: str | None = None
+
+
+def _row_to_message(row) -> Message:
+    """Convert a messages row into a Message."""
+    return Message(
+        id=row[0],
+        group_id=row[1],
+        group_name=row[2],
+        message_id=row[3],
+        sender_name=row[4],
+        text=row[5],
+        timestamp=datetime.fromisoformat(row[6]),
+        collected_at=datetime.fromisoformat(row[7]),
+        forward_from=row[8],
+    )
 
 
 class Database:
@@ -54,6 +75,7 @@ class Database:
                 text TEXT NOT NULL,
                 timestamp DATETIME NOT NULL,
                 collected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                forward_from TEXT,
                 UNIQUE(group_id, message_id)
             )
         """)
@@ -73,6 +95,14 @@ class Database:
             ON messages(timestamp)
         """)
 
+        # Databases made before forward tracking lack this column.
+        cursor = await self._connection.execute("PRAGMA table_info(messages)")
+        columns = [row[1] for row in await cursor.fetchall()]
+        if "forward_from" not in columns:
+            await self._connection.execute(
+                "ALTER TABLE messages ADD COLUMN forward_from TEXT"
+            )
+
         await self._connection.commit()
 
     async def save_message(self, message: Message) -> int:
@@ -84,8 +114,8 @@ class Database:
         cursor = await self._connection.execute(
             """
             INSERT OR IGNORE INTO messages
-            (group_id, group_name, message_id, sender_name, text, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (group_id, group_name, message_id, sender_name, text, timestamp, forward_from)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 message.group_id,
@@ -94,6 +124,7 @@ class Database:
                 message.sender_name,
                 message.text,
                 message.timestamp,
+                message.forward_from,
             ),
         )
         await self._connection.commit()
@@ -115,7 +146,7 @@ class Database:
             cursor = await self._connection.execute(
                 """
                 SELECT id, group_id, group_name, message_id, sender_name,
-                       text, timestamp, collected_at
+                       text, timestamp, collected_at, forward_from
                 FROM messages
                 WHERE timestamp >= ? AND group_id = ?
                 ORDER BY timestamp ASC
@@ -126,7 +157,7 @@ class Database:
             cursor = await self._connection.execute(
                 """
                 SELECT id, group_id, group_name, message_id, sender_name,
-                       text, timestamp, collected_at
+                       text, timestamp, collected_at, forward_from
                 FROM messages
                 WHERE timestamp >= ?
                 ORDER BY timestamp ASC
@@ -135,26 +166,14 @@ class Database:
             )
 
         rows = await cursor.fetchall()
-        return [
-            Message(
-                id=row[0],
-                group_id=row[1],
-                group_name=row[2],
-                message_id=row[3],
-                sender_name=row[4],
-                text=row[5],
-                timestamp=datetime.fromisoformat(row[6]),
-                collected_at=datetime.fromisoformat(row[7]),
-            )
-            for row in rows
-        ]
+        return [_row_to_message(row) for row in rows]
 
     async def get_unprocessed_messages(self) -> list[Message]:
         """Get undigested messages from the last 24 hours. Older ones are stale."""
         cursor = await self._connection.execute(
             """
             SELECT id, group_id, group_name, message_id, sender_name,
-                   text, timestamp, collected_at
+                   text, timestamp, collected_at, forward_from
             FROM messages
             WHERE collected_at > (
                 SELECT COALESCE(MAX(created_at), '1970-01-01') FROM digests
@@ -165,19 +184,7 @@ class Database:
         )
 
         rows = await cursor.fetchall()
-        return [
-            Message(
-                id=row[0],
-                group_id=row[1],
-                group_name=row[2],
-                message_id=row[3],
-                sender_name=row[4],
-                text=row[5],
-                timestamp=datetime.fromisoformat(row[6]),
-                collected_at=datetime.fromisoformat(row[7]),
-            )
-            for row in rows
-        ]
+        return [_row_to_message(row) for row in rows]
 
     async def record_digest(self, message_count: int, summary: str):
         """Record that a digest was created."""

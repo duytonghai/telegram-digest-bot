@@ -10,6 +10,7 @@ from .collector.message_collector import MessageCollector
 from .analyzer.message_analyzer import MessageAnalyzer
 from .digest.digest_sender import DigestSender
 from .scheduler.job_scheduler import JobScheduler
+from .analyzer.result_validator import has_signal
 from .ai_providers.factory import build_ai_manager
 
 
@@ -52,6 +53,11 @@ async def run_digest():
         sender = DigestSender()
 
         for group_name, result, msg_count in results:
+            if not has_signal(result):
+                print(f"  ⏭️  Skipping '{group_name}' (no news value)")
+                await db.record_digest(msg_count, f"{group_name}: skipped, no news value")
+                continue
+
             print(f"  📨 Sending digest for '{group_name}' ({msg_count} messages, importance: {result.importance_score:.0%})")
             await sender.send_digest(result, msg_count, group_name)
 

@@ -6,10 +6,18 @@ from dataclasses import dataclass, field
 from ..prompts import get_base_system_prompt
 
 
+def _to_float(value, default: float) -> float:
+    """Read a number from AI output. Fall back when it is not numeric."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 @dataclass
 class SummaryItem:
     """A single summary item with source attribution."""
-    type: str  # fact, opinion, rumor
+    type: str  # reported, opinion, rumor
     text: str
     sources: list[str] = field(default_factory=list)
     raw_quotes: list[str] = field(default_factory=list)
@@ -35,8 +43,8 @@ class FactCheckItem:
 @dataclass
 class AnalysisResult:
     """Structured result from AI analysis."""
-    summary: list[SummaryItem]  # 8-12 items with source attribution
-    assessment: list[AssessmentItem]  # 5-8 AI insights/risks/opportunities
+    summary: list[SummaryItem]  # Up to 12 items with source attribution
+    assessment: list[AssessmentItem]  # Up to 8 AI insights/risks/opportunities
     fact_check: list[FactCheckItem]  # Verifiable claims with confidence
     sentiment: str  # positive, negative, neutral, mixed
     topics: list[str]  # e.g., ["Crypto", "Finance", "Geopolitics"]
@@ -69,12 +77,12 @@ class BaseAIProvider(ABC):
 
     @abstractmethod
     async def analyze(
-        self, messages: list[str], context: dict
+        self, messages: list[dict], context: dict
     ) -> AnalysisResult:
         """Analyze messages and return structured result.
 
         Args:
-            messages: List of message texts to analyze.
+            messages: Message dicts to analyze.
             context: Additional context (e.g., group name, date range).
 
         Returns:
@@ -140,18 +148,18 @@ FINANCE-SPECIFIC RULES (apply in addition to base rules)
             for item in raw_summary:
                 if isinstance(item, dict):
                     summary_items.append(SummaryItem(
-                        type=item.get("type", "fact"),
+                        type=item.get("type", "reported"),
                         text=item.get("text", ""),
                         sources=item.get("sources", []),
                         raw_quotes=item.get("raw_quotes", []),
                     ))
                 elif isinstance(item, str):
-                    summary_items.append(SummaryItem(type="fact", text=item, sources=[], raw_quotes=[]))
+                    summary_items.append(SummaryItem(type="reported", text=item, sources=[], raw_quotes=[]))
         elif isinstance(raw_summary, str):
             # Legacy format: split string into items
             for line in raw_summary.split("\n"):
                 if line.strip():
-                    summary_items.append(SummaryItem(type="fact", text=line.strip(), sources=[], raw_quotes=[]))
+                    summary_items.append(SummaryItem(type="reported", text=line.strip(), sources=[], raw_quotes=[]))
 
         # Parse assessment items
         assessment_items = []
@@ -181,7 +189,7 @@ FINANCE-SPECIFIC RULES (apply in addition to base rules)
                         claim=item.get("claim", ""),
                         sources=item.get("sources", []),
                         status=item.get("status", "not_checkable"),
-                        confidence=float(item.get("confidence", 0.0)),
+                        confidence=_to_float(item.get("confidence"), 0.0),
                     ))
         elif isinstance(raw_fact_check, dict):
             # Legacy format: {"claims": [...], "confidence": 0.5}
@@ -193,14 +201,14 @@ FINANCE-SPECIFIC RULES (apply in addition to base rules)
                         claim=claim.get("claim", str(claim)),
                         sources=claim.get("sources", []),
                         status=claim.get("status", "single_source"),
-                        confidence=float(claim.get("confidence", default_confidence)),
+                        confidence=_to_float(claim.get("confidence"), default_confidence),
                     ))
                 elif isinstance(claim, str):
                     fact_check_items.append(FactCheckItem(
                         claim=claim,
                         sources=[],
                         status="single_source",
-                        confidence=float(default_confidence),
+                        confidence=_to_float(default_confidence, 0.5),
                     ))
 
         return AnalysisResult(
@@ -209,7 +217,7 @@ FINANCE-SPECIFIC RULES (apply in addition to base rules)
             fact_check=fact_check_items,
             sentiment=parsed.get("sentiment", "neutral"),
             topics=parsed.get("topics", ["Other"]),
-            importance_score=float(parsed.get("importance_score", 0.5)),
+            importance_score=_to_float(parsed.get("importance_score"), 0.5),
             language=parsed.get("language", "vi"),
             unknowns=parsed.get("unknowns", []),
             raw_response=raw_content,
